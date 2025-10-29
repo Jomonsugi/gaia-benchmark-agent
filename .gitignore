@@ -1,0 +1,23 @@
+# Cache and local data
+questions_cache.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environments
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+
+gaia_cache/
+questions_cache.json
+studio/.langgraph_api/
