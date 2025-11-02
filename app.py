@@ -365,7 +365,7 @@ with gr.Blocks() as demo:
     # Note: Profile is automatically injected by LoginButton when function accepts it as first parameter
     fetch_button.click(
         fn=fetch_questions,
-        inputs=[login_button, refresh_cb, questions_state],
+        inputs=[refresh_cb, questions_state],
         outputs=[status_output, questions_table, questions_state, select_all_cb],
     )
 
@@ -383,7 +383,7 @@ with gr.Blocks() as demo:
 
     submit_button.click(
         fn=submit_answers,
-        inputs=[login_button, questions_state, answers_state],
+        inputs=[questions_state, answers_state],
         outputs=[status_output],
     )
 

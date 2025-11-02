@@ -14,6 +14,8 @@ from tools import (
     youtube_transcript_tool,
     download_gaia_attachment_tool,
     read_text_file_tool,
+    read_excel_file_tool,
+    transcribe_audio_tool,
 )
 
 hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
@@ -40,18 +42,26 @@ def create_graph():
         youtube_transcript_tool,
         download_gaia_attachment_tool,
         read_text_file_tool,
+        read_excel_file_tool,
+        transcribe_audio_tool,
     ]
     chat_with_tools = chat.bind_tools(tools)
 
     sys_msg = SystemMessage(content="""
-You are a helpful assistant tasked with answering questions. The questions are complex and require the use of tools to answer.
+You are a helpful assistant tasked with answering questions. The questions are complex and require the use of various tools to answer the questions.
 
 When a question mentions an attached file (look for "Attached file: <filename>"):
 1. First use download_gaia_attachment with the file name to get the local path
-2. Then use read_text_file with that path to read the file contents (for .py, .txt, .json, .csv, .md files)
-3. Use the file contents to answer the question
+2. Then use a tool to read the file contents based on the file type ONCE - the full file contents will be returned:
+   - For text files (.py, .txt, .md, .json, .csv): use read_text_file
+   - For Excel files (.xlsx, .xls): use ExcelReader
+   - For audio files (.mp3, .wav, .m4a): use transcribe_audio
+3. Use the file contents from step 2 to answer the question - DO NOT re-read the same file
+
+IMPORTANT: Only read each file ONCE. The tool output contains all the data you need.
 
 After using the applicable tool(s), return only the final answer text (no extra commentary).
+CRITICAL: Each question defines the expected format for the answer. Your final answer should be in the correct format. Only return the final answer text, no extra commentary.
 """)
 
     def assistant(state: AgentState):

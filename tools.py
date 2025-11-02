@@ -1,9 +1,13 @@
+import pandas as pd
+
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_tavily import TavilySearch
 from langchain_core.tools import Tool
 from langchain_community.document_loaders import YoutubeLoader
 from huggingface_hub import hf_hub_download, list_repo_files
+from transformers import pipeline
+import librosa
 import random
 import os
 import pathlib
@@ -151,4 +155,83 @@ read_text_file_tool = Tool(
         "Read the contents of a local text file (.py, .txt, .md, .json, .csv). "
         "Input: absolute file path. Output: file contents as text."
     ),
+)
+
+def read_excel_file(file_path: str) -> str:
+    """
+    Read a excel file and return its contents with full decimal precision preserved.
+    Use for .xlsx and .xls files.
+    
+    Input: absolute file path
+    Output: file contents of the dataframe in string format
+    """
+    try:
+        df = pd.read_excel(file_path)
+        
+        # Set pandas display options to preserve high precision
+        with pd.option_context('display.precision', 10, 'display.max_columns', None, 'display.width', None):
+            df_str = df.to_string(index=False)
+        
+        return f"Excel file loaded ({len(df)} rows, {len(df.columns)} columns). Full contents:\n\n{df_str}"
+    except Exception as e:
+        return f"Error reading Excel file: {e}"
+
+# Create the LangChain tool
+read_excel_file_tool = Tool(
+    name="ExcelReader",
+    func=read_excel_file,
+    description=(
+        "Read Microsoft Excel files (.xlsx or .xls). Returns the full DataFrame contents as text. "
+        "Use this ONCE per file - the output contains all data needed for analysis. "
+        "Input: absolute file path. Output: full DataFrame contents as text."
+    )
+)
+
+
+def transcribe_audio(file_path: str) -> str:
+    """
+    Transcribe audio file (.mp3, .wav, .m4a, etc.) to text using Whisper speech-to-text.
+    
+    Input: absolute file path
+    Output: transcribed text
+    """
+    try:
+        path = pathlib.Path(file_path)
+        if not path.exists():
+            return f"ERROR: Audio file not found at {file_path}"
+        
+        # Load audio file using librosa (handles MP3 without ffmpeg dependency)
+        # Whisper expects 16kHz sample rate
+        audio, sr = librosa.load(str(path), sr=16000)
+        
+        # Load Whisper model via transformers
+        # Using 'base' model for good balance of speed and accuracy
+        # For better accuracy, can use 'small' or 'medium', but slower
+        pipe = pipeline(
+            "automatic-speech-recognition",
+            model="openai/whisper-base",
+            device=-1  # Use CPU (-1) or GPU (0+) if available
+        )
+        
+        # Pass raw audio array instead of file path (avoids ffmpeg requirement)
+        result = pipe(audio)
+        transcript = result.get("text", "")
+        
+        if not transcript:
+            return "ERROR: Transcription produced no text output."
+        
+        return transcript
+        
+    except Exception as e:
+        return f"ERROR transcribing audio: {e}"
+
+
+transcribe_audio_tool = Tool(
+    name="transcribe_audio",
+    func=transcribe_audio,
+    description=(
+        "Transcribe audio files (.mp3, .wav, .m4a, etc.) to text using speech-to-text. "
+        "Use this ONCE per audio file - the output contains the full transcription. "
+        "Input: absolute file path. Output: transcribed text."
+    )
 )
