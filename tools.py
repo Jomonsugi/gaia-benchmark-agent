@@ -214,8 +214,16 @@ def transcribe_audio(file_path: str) -> str:
         )
         
         # Pass raw audio array instead of file path (avoids ffmpeg requirement)
-        result = pipe(audio)
-        transcript = result.get("text", "")
+        # For audio > 30 seconds, Whisper requires return_timestamps=True for long-form generation
+        # extract just the text from the result
+        result = pipe(audio, return_timestamps=True)
+        
+        # Extract text from result
+        if isinstance(result, dict):
+            transcript = result.get("text", "")
+        else:
+            # If result is just a string
+            transcript = str(result) if result else ""
         
         if not transcript:
             return "ERROR: Transcription produced no text output."

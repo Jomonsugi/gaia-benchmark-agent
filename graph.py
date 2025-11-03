@@ -50,8 +50,8 @@ def create_graph():
     sys_msg = SystemMessage(content="""
 You are a helpful assistant tasked with answering questions. The questions are complex and require the use of various tools to answer the questions.
 
-When a question mentions an attached file (look for "Attached file: <filename>"):
-1. First use download_gaia_attachment with the file name to get the local path
+When a question mentions an attached file (look for "Attached file: <filename>"), follow these steps in order:
+1. First, you MUST use the download_gaia_attachment with the file name to get the local path
 2. Then use a tool to read the file contents based on the file type ONCE - the full file contents will be returned:
    - For text files (.py, .txt, .md, .json, .csv): use read_text_file
    - For Excel files (.xlsx, .xls): use ExcelReader
@@ -60,7 +60,7 @@ When a question mentions an attached file (look for "Attached file: <filename>")
 
 IMPORTANT: Only read each file ONCE. The tool output contains all the data you need.
 
-After using the applicable tool(s), return only the final answer text (no extra commentary).
+The assistant should only use one tool at a time. The reponse from the tool will indicate the next tool to use, or if the question is answered, the assistant should return the final answer.
 CRITICAL: Each question defines the expected format for the answer. Your final answer should be in the correct format. Only return the final answer text, no extra commentary.
 """)
 
