@@ -1,17 +1,26 @@
+import os
+import warnings
+
+# Suppress TensorFlow warnings (from board_to_fen library)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress INFO/WARN/ERROR
+warnings.filterwarnings("ignore", message=".*tf.function retracing.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
+
 import pandas as pd
 
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_tavily import TavilySearch
 from langchain_core.tools import Tool
+from langchain_core.runnables import RunnableLambda
 from langchain_community.document_loaders import YoutubeLoader
 from huggingface_hub import hf_hub_download, list_repo_files
 from transformers import pipeline
+import chess
+import chess.engine
 import librosa
 import random
-import os
 import pathlib
-import mimetypes
 
 
 # Initialize the DuckDuckGo search tool
@@ -78,7 +87,7 @@ GAIA_CACHE_DIR = pathlib.Path(__file__).parent / "gaia_cache"
 GAIA_CACHE_DIR.mkdir(exist_ok=True)
 
 
-def download_gaia_attachment(file_name: str) -> str:
+def download_file_attachment(file_name: str) -> str:
     """
     Download a GAIA benchmark attachment file by its file name.
     Returns the absolute local path to the downloaded file.
@@ -117,9 +126,9 @@ def download_gaia_attachment(file_name: str) -> str:
         return f"ERROR downloading GAIA file: {e}"
 
 
-download_gaia_attachment_tool = Tool(
-    name="download_gaia_attachment",
-    func=download_gaia_attachment,
+download_file_attachment_tool = Tool(
+    name="download_file_attachment",
+    func=download_file_attachment,
     description=(
         "Download a GAIA benchmark attachment file by its file name (e.g., 'abc123.mp3', 'xyz.py'). "
         "Returns the absolute local file path. Use this when a question mentions an attached file."
@@ -243,3 +252,110 @@ transcribe_audio_tool = Tool(
         "Input: absolute file path. Output: transcribed text."
     )
 )
+
+
+from board_to_fen.predict import get_fen_from_image_path
+
+
+def get_fen_from_image_file_path(file_path: str) -> str:
+    """
+    Extract a chess position FEN from a board image (.png/.jpg) using board_to_fen.
+    Returns a full FEN. If side-to-move is missing, defaults to black to move.
+    """
+    try:
+        path = pathlib.Path(file_path)
+        if not path.exists():
+            return f"ERROR: Image not found at {file_path}"
+        fen = get_fen_from_image_path(str(path))
+        # Ensure full FEN (side to move etc.). If only piece placement returned, append defaults.
+        if fen.count(" ") < 5:
+            fen = f"{fen} b - - 0 1"
+        return fen
+    except Exception as e:
+        return f"ERROR extracting FEN via board_to_fen: {e}"
+
+
+get_fen_from_image_file_path_tool = Tool(
+    name="get_fen_from_image_file_path",
+    func=get_fen_from_image_file_path,
+    description=(
+        "Extract a chess position FEN string from a board image (.png/.jpg) using board_to_fen. "
+        "Input: absolute image path. Output: FEN string (assumes black to move by default)."
+    ),
+)
+
+
+# Analyze a FEN with python-chess + Stockfish
+def chess_best_move_from_fen(fen: str) -> str:
+    """
+    Given a FEN string, return the best move for the side to move in algebraic notation (SAN).
+    Requires a UCI engine available at STOCKFISH_PATH or in PATH as 'stockfish'.
+    """
+    try:
+        board = chess.Board(fen)
+        engine_path = os.getenv("STOCKFISH_PATH") or "stockfish"
+        with chess.engine.SimpleEngine.popen_uci(engine_path) as eng:
+            result = eng.play(board, chess.engine.Limit(time=2.0))
+            move = result.move
+            return board.san(move)
+    except Exception as e:
+        return f"ERROR analyzing FEN: {e}"
+
+
+chess_best_move_from_fen_tool = Tool(
+    name="chess_best_move_from_fen",
+    func=chess_best_move_from_fen,
+    description=(
+        "Analyze a chess position given a FEN string and return the best move in algebraic notation. "
+        "Requires STOCKFISH_PATH env or 'stockfish' in PATH. Input: FEN string. Output: SAN move."
+    ),
+)
+
+
+# -----------------------------
+# Combined: chess best move from image (FEN extraction + engine)
+# -----------------------------
+
+def chess_best_move_from_image(file_path: str) -> str:
+    """
+    Given a chessboard image (.png/.jpg), extract FEN via board_to_fen and
+    return the best move (SAN) using python-chess + Stockfish.
+    Requires STOCKFISH_PATH env or 'stockfish' in PATH.
+    """
+    try:
+        path = pathlib.Path(file_path)
+        if not path.exists():
+            return f"ERROR: Image not found at {file_path}"
+        fen = get_fen_from_image_path(str(path))
+        if fen.count(" ") < 5:
+            fen = f"{fen} b - - 0 1"
+        board = chess.Board(fen)
+        engine_path = os.getenv("STOCKFISH_PATH") or "stockfish"
+        with chess.engine.SimpleEngine.popen_uci(engine_path) as eng:
+            result = eng.play(board, chess.engine.Limit(time=2.0))
+            move = result.move
+            return board.san(move)
+    except Exception as e:
+        return f"ERROR solving chess from image: {e}"
+
+
+# Build a pipeline that chains the FEN extractor and Stockfish analyzer
+extract_fen_runnable = RunnableLambda(
+    lambda path: get_fen_from_image_file_path_tool.func(path)
+).with_config(run_name="extract_fen_from_image", tags=["chess", "fen"])
+
+solve_fen_runnable = RunnableLambda(
+    lambda fen: chess_best_move_from_fen_tool.func(fen)
+).with_config(run_name="analyze_fen_with_stockfish", tags=["chess", "stockfish"])
+
+_chess_pipeline = extract_fen_runnable | solve_fen_runnable
+
+chess_best_move_from_image_tool = Tool(
+    name="chess_best_move_from_image",
+    func=_chess_pipeline.invoke,
+    description=(
+        "Given a chessboard image (.png/.jpg), extract the FEN and return the best move in algebraic notation "
+        "using Stockfish. Input: absolute image path. Output: SAN move."
+    ),
+)
+

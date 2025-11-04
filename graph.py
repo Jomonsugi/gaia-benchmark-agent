@@ -12,10 +12,11 @@ from tools import (
     wikipedia_search_tool,
     tavily_search_tool,
     youtube_transcript_tool,
-    download_gaia_attachment_tool,
+    download_file_attachment_tool,
     read_text_file_tool,
     read_excel_file_tool,
     transcribe_audio_tool,
+    chess_best_move_from_image_tool,
 )
 
 hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
@@ -40,27 +41,41 @@ def create_graph():
         wikipedia_search_tool,
         tavily_search_tool,
         youtube_transcript_tool,
-        download_gaia_attachment_tool,
+        download_file_attachment_tool,
         read_text_file_tool,
         read_excel_file_tool,
         transcribe_audio_tool,
+        chess_best_move_from_image_tool,
     ]
     chat_with_tools = chat.bind_tools(tools)
 
     sys_msg = SystemMessage(content="""
-You are a helpful assistant tasked with answering questions. The questions are complex and require the use of various tools to answer the questions.
+You are a tool-using assistant that must follow the ReAct protocol (Reason + Act) for every turn. Maintain a tight Observe → Think → Act → Reflect loop and never skip steps.
 
-When a question mentions an attached file (look for "Attached file: <filename>"), follow these steps in order:
-1. First, you MUST use the download_gaia_attachment with the file name to get the local path
-2. Then use a tool to read the file contents based on the file type ONCE - the full file contents will be returned:
-   - For text files (.py, .txt, .md, .json, .csv): use read_text_file
-   - For Excel files (.xlsx, .xls): use ExcelReader
-   - For audio files (.mp3, .wav, .m4a): use transcribe_audio
-3. Use the file contents from step 2 to answer the question - DO NOT re-read the same file
+Observe:
+- Carefully read the latest user message and any tool results.
+- Identify whether the user referenced "Attached file: <filename>".
 
-IMPORTANT: Only read each file ONCE. The tool output contains all the data you need.
+Think (Plan):
+- Briefly outline the single next step you will take. Do NOT plan multiple actions at once.
+- If the question mentions an attachment, your plan MUST follow this order:
+  1. Call download_file_attachment with the provided file name to obtain the local path.
+  2. Call exactly one file-processing tool based on the extension (read_text_file, ExcelReader, transcribe_audio, or chess_best_move_from_image). Each file should be read only once.
+  3. Reason over the returned content to produce the answer.
+- If there is no "Attached file:" string, do NOT call download_file_attachment.
 
-The assistant should only use one tool at a time. The reponse from the tool will indicate the next tool to use, or if the question is answered, the assistant should return the final answer.
+Act:
+- If you need information, issue exactly ONE tool call in the format the tooling layer expects.
+- Wait for the tool result before thinking or acting again. Never request multiple tools in the same turn.
+
+Reflect:
+- Update your understanding using the tool output.
+- Once you have everything required, respond with the final answer. Match the exact output format requested in the question and return only the final answer text.
+
+General Rules:
+- Do not reread the same file or re-download attachments.
+- Obey answer-format instructions precisely (comma-separated lists, single numbers, alphabetical order, etc.).
+
 CRITICAL: Each question defines the expected format for the answer. Your final answer should be in the correct format. Only return the final answer text, no extra commentary.
 """)
 
