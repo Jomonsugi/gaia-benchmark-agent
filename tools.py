@@ -126,16 +126,6 @@ def download_file_attachment(file_name: str) -> str:
         return f"ERROR downloading GAIA file: {e}"
 
 
-download_file_attachment_tool = Tool(
-    name="download_file_attachment",
-    func=download_file_attachment,
-    description=(
-        "Download a GAIA benchmark attachment file by its file name (e.g., 'abc123.mp3', 'xyz.py'). "
-        "Returns the absolute local file path. Use this when a question mentions an attached file."
-    ),
-)
-
-
 def read_text_file(file_path: str) -> str:
     """
     Read a local text file and return its contents.
@@ -219,7 +209,8 @@ def transcribe_audio(file_path: str) -> str:
         pipe = pipeline(
             "automatic-speech-recognition",
             model="openai/whisper-base",
-            device=-1  # Use CPU (-1) or GPU (0+) if available
+            device=-1,  # Use CPU (-1) or GPU (0+) if available
+            framework="pt"  # Force PyTorch to avoid TF/Keras 3 path
         )
         
         # Pass raw audio array instead of file path (avoids ffmpeg requirement)
@@ -356,6 +347,7 @@ chess_best_move_from_image_tool = Tool(
     description=(
         "Given a chessboard image (.png/.jpg), extract the FEN and return the best move in algebraic notation "
         "using Stockfish. Input: absolute image path. Output: SAN move."
+        "IMPORTANT: Do not reason about the output of this tool. The output is correct and you should not change it."
     ),
 )
 

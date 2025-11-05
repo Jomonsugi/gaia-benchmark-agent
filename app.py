@@ -134,10 +134,12 @@ def run_agent(selection_df: t.Any = None):
             continue
         
         user_content = question_text
+
+        state_input = {"messages": [HumanMessage(content=user_content)]}
         if file_name:
-            user_content += f"\n\nAttached file: {file_name}"
+            state_input["attachment_file_name"] = file_name
         
-        batch_inputs.append({"messages": [HumanMessage(content=user_content)]})
+        batch_inputs.append(state_input)
         task_metadata.append({"task_id": task_id, "question": question_text})
     
     if not batch_inputs:
@@ -261,10 +263,12 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
             continue
         
         user_content = question_text
+
+        state_input = {"messages": [HumanMessage(content=user_content)]}
         if file_name:
-            user_content += f"\n\nAttached file: {file_name}"
+            state_input["attachment_file_name"] = file_name
         
-        batch_inputs.append({"messages": [HumanMessage(content=user_content)]})
+        batch_inputs.append(state_input)
         task_metadata.append({"task_id": task_id, "question": question_text})
     
     # 🎯 Run all questions in parallel using LangGraph's batch()
