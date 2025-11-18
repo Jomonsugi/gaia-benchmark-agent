@@ -8,10 +8,13 @@ import json
 from langchain_core.messages import HumanMessage
 from graph import graph as agent_graph
 
-# (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 QUESTIONS_CACHE_PATH = os.path.join(os.path.dirname(__file__), "questions_cache.json")
+
+# Global LangGraph execution settings (used for all batch runs)
+DEFAULT_RECURSION_LIMIT = 25
+DEFAULT_MAX_CONCURRENCY = 5
 
 def load_cached_questions() -> list:
     try:
@@ -61,7 +64,7 @@ def fetch_questions(profile: gr.OAuthProfile | None, refresh: bool = True, quest
         rows = []
         for q in questions_data:
             row = {
-                "Selected": True,
+                "Selected": False,  # Default: nothing selected until user chooses
                 "Task ID": q.get("task_id"),
                 "Question": q.get("question"),
                 # Always include columns so they appear in the table
@@ -77,7 +80,8 @@ def fetch_questions(profile: gr.OAuthProfile | None, refresh: bool = True, quest
         for col in ["File Name", "File URL"]:
             if col not in qdf.columns:
                 qdf[col] = ""
-        return f"Fetched {len(questions_data)} questions for '{username}'.", gr.update(value=qdf), questions_data, gr.update(value=True)
+        # By default, no rows are selected and the 'select all' checkbox is unchecked.
+        return f"Fetched {len(questions_data)} questions for '{username}'.", gr.update(value=qdf), questions_data, gr.update(value=False)
     except Exception as e:
         # Attempt to fall back to disk cache on network error
         cached = load_cached_questions()
@@ -85,7 +89,7 @@ def fetch_questions(profile: gr.OAuthProfile | None, refresh: bool = True, quest
             rows = []
             for q in cached:
                 row = {
-                    "Selected": True,
+                    "Selected": False,  # Default: nothing selected until user chooses
                     "Task ID": q.get("task_id"),
                     "Question": q.get("question"),
                     "File Name": q.get("file_name") or "",
@@ -98,11 +102,12 @@ def fetch_questions(profile: gr.OAuthProfile | None, refresh: bool = True, quest
             for col in ["File Name", "File URL"]:
                 if col not in qdf.columns:
                     qdf[col] = ""
+            # By default, no rows are selected and the 'select all' checkbox is unchecked.
             return (
                 f"Network error, loaded {len(cached)} cached questions.",
                 gr.update(value=qdf),
                 cached,
-                gr.update(value=True),
+                gr.update(value=False),
             )
         return f"Error fetching questions: {e}", gr.update(value=pd.DataFrame()), (questions_state or []), gr.update()
 
@@ -149,7 +154,10 @@ def run_agent(selection_df: t.Any = None):
     try:
         results = agent_graph.batch(
             batch_inputs,
-            config={"recursion_limit": 8, "max_concurrency": 5}
+            config={
+                "recursion_limit": DEFAULT_RECURSION_LIMIT,
+                "max_concurrency": DEFAULT_MAX_CONCURRENCY,
+            },
         )
     except Exception as e:
         return f"Error running batch: {e}", pd.DataFrame(), []
@@ -276,7 +284,10 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
     try:
         results = agent_graph.batch(
             batch_inputs,
-            config={"recursion_limit": 8, "max_concurrency": 5}
+            config={
+                "recursion_limit": DEFAULT_RECURSION_LIMIT,
+                "max_concurrency": DEFAULT_MAX_CONCURRENCY,
+            },
         )
     except Exception as e:
         return f"Error running batch: {e}", None
@@ -354,7 +365,8 @@ with gr.Blocks() as demo:
     run_button = gr.Button("Run Agent (no submission)")
     submit_button = gr.Button("Submit Answers for Scoring")
     refresh_cb = gr.Checkbox(label="Refresh questions from API", value=False)
-    select_all_cb = gr.Checkbox(label="Select all questions", value=True)
+    # Default: no questions selected and 'select all' unchecked until user opts in
+    select_all_cb = gr.Checkbox(label="Select all questions", value=False)
 
     status_output = gr.Textbox(label="Status", lines=5, interactive=False)
     questions_table = gr.Dataframe(

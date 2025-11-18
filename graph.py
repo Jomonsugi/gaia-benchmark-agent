@@ -9,18 +9,22 @@ from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, AIM
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
 from tools import (
-    basic_search_tool,
+    # basic_search_tool,
     wikipedia_search_tool,
-    tavily_search_tool,
+    tavily_web_search_tool,
     youtube_transcript_tool,
+    web_fetch_page_tool,
+    interactive_web_browse_tool,
+    youtube_video_visual_qa_tool,
     read_text_file_tool,
     read_excel_file_tool,
     transcribe_audio_tool,
     chess_best_move_from_image_tool,
+    vision_qa_tool,
     download_file_attachment,
 )
 
-hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+hf_token = os.getenv("HUGGING_FACE_HUB_TOKEN")
 
 
 class AgentState(TypedDict, total=False):
@@ -32,7 +36,9 @@ class AgentState(TypedDict, total=False):
 def load_llm():
     llm = HuggingFaceEndpoint(
         # repo_id="Qwen/Qwen2.5-Coder-32B-Instruct",
-        repo_id="Qwen/Qwen3-VL-235B-A22B-Instruct",
+        # repo_id="Qwen/Qwen3-VL-235B-A22B-Instruct",
+        repo_id="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+        # repo_id="deepseek-ai/DeepSeek-R1-0528",
         huggingfacehub_api_token=hf_token,
     )
     return ChatHuggingFace(llm=llm, verbose=True)
@@ -41,14 +47,18 @@ def load_llm():
 def create_graph():
     chat = load_llm()
     tools = [
-        basic_search_tool,
+        # basic_search_tool,
         wikipedia_search_tool,
-        tavily_search_tool,
+        tavily_web_search_tool,
         youtube_transcript_tool,
+        web_fetch_page_tool,
+        interactive_web_browse_tool,
+        youtube_video_visual_qa_tool,
         read_text_file_tool,
         read_excel_file_tool,
         transcribe_audio_tool,
         chess_best_move_from_image_tool,
+        vision_qa_tool,
     ]
     chat_with_tools = chat.bind_tools(tools)
 
