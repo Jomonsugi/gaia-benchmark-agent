@@ -9,7 +9,6 @@ from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, AIM
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
 from tools import (
-    # basic_search_tool,
     wikipedia_search_tool,
     tavily_web_search_tool,
     youtube_transcript_tool,
@@ -47,7 +46,6 @@ def load_llm():
 def create_graph():
     chat = load_llm()
     tools = [
-        # basic_search_tool,
         wikipedia_search_tool,
         tavily_web_search_tool,
         youtube_transcript_tool,

@@ -13,7 +13,7 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 QUESTIONS_CACHE_PATH = os.path.join(os.path.dirname(__file__), "questions_cache.json")
 
 # Global LangGraph execution settings (used for all batch runs)
-DEFAULT_RECURSION_LIMIT = 25
+DEFAULT_RECURSION_LIMIT = 50
 DEFAULT_MAX_CONCURRENCY = 5
 
 def load_cached_questions() -> list:

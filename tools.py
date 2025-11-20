@@ -8,21 +8,19 @@ warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 
 import pandas as pd
 
-from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
+from langchain_community.tools import WikipediaQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper
 from langchain_tavily import TavilySearch
 from langchain_core.tools import Tool, StructuredTool
 from langchain_core.runnables import RunnableLambda
 from langchain_community.document_loaders import YoutubeLoader
-from huggingface_hub import hf_hub_download, list_repo_files, InferenceClient
+from huggingface_hub import hf_hub_download, list_repo_files
 from transformers import pipeline
 import chess
 import chess.engine
 import librosa
 import random
 import pathlib
-import base64
-from PIL import Image
 import subprocess
 import hashlib
 import re
@@ -36,8 +34,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 
 
-# Initialize the DuckDuckGo search tool
-# basic_search_tool = DuckDuckGoSearchRun()
+
 # The WikipediaQueryRun tool defaults to topKResults=3 and maxDocContentLength=4000.
 # This provides up to 3 snippets (each up to ~4000 characters) concatenated into one string.
 wikipedia_api_wrapper = WikipediaAPIWrapper(top_k_results=3, doc_content_chars_max=4000)
@@ -55,27 +52,6 @@ tavily_web_search_tool = TavilySearch(
     topic="general",
     description="Search the web for information on a given topic."
 )
-
-
-def get_weather_info(location: str) -> str:
-    """Fetches dummy weather information for a given location."""
-    # Dummy weather data
-    weather_conditions = [
-        {"condition": "Rainy", "temp_c": 15},
-        {"condition": "Clear", "temp_c": 25},
-        {"condition": "Windy", "temp_c": 20}
-    ]
-    # Randomly select a weather condition
-    data = random.choice(weather_conditions)
-    return f"Weather in {location}: {data['condition']}, {data['temp_c']}°C"
-
-# Initialize the tool
-weather_info_tool = Tool(
-    name="get_weather_info",
-    func=get_weather_info,
-    description="Fetches dummy weather information for a given location."
-)
-
 
 def fetch_youtube_transcript(url: str) -> str:
     """Returns the transcript text for a YouTube video URL.
@@ -175,15 +151,13 @@ youtube_video_visual_qa_tool = StructuredTool.from_function(
     func=youtube_video_visual_qa_tool_func,
     name="youtube_video_visual_qa_tool",
     description=(
-        "Answer a question about the visual content of a short YouTube video using "
+        "Answer a question about the visual content of a short YouTube video."
         "Input the YouTube URL and your question."
     ),
 )
 
 
-# -----------------------------
 # Web page retrieval helpers
-# -----------------------------
 
 DEFAULT_WEB_HEADERS = {
     "User-Agent": (
@@ -302,9 +276,7 @@ web_fetch_page_tool = StructuredTool.from_function(
 )
 
 
-# -----------------------------
 # Playwright-powered browser mini-agent
-# -----------------------------
 
 def interactive_web_browse(
     url: str,
@@ -506,7 +478,6 @@ def read_excel_file(file_path: str) -> str:
     except Exception as e:
         return f"Error reading Excel file: {e}"
 
-# Create the LangChain tool
 read_excel_file_tool = Tool(
     name="ExcelReader",
     func=read_excel_file,
@@ -575,20 +546,42 @@ transcribe_audio_tool = Tool(
     )
 )
 
+def _get_perspective_from_image_file_path(image_path: str) -> str:
+    """
+    Determine if the chess board image is from the perspective of the white or black player.
+    Returns "white" or "black".
+    """
+    question = """Determine if this chess board image is from the perspective of the white or black player. Answer in only one word: "white" or "black"."""
+    
+    perspective = vision_qa(image_path, question)
+
+    if perspective == "white":
+        black_view = False
+    elif perspective == "black":
+        black_view = True
+    else:
+        return f"ERROR: Could not determine the perspective of the chess board image. Output: {perspective}."
+
+    return black_view
+
 def get_fen_from_image_file_path(file_path: str, black_to_move: bool = True) -> str:
     """
-    Extract a chess position FEN from a board image (.png/.jpg) using board_to_fen.
+    Extract a chess position FEN from a board image (.png/.jpg).
     Returns a full FEN with the correct side to move indicator.
     
     Args:
         file_path: Absolute path to the chess board image
         black_to_move: True if black is to move (default), False if white is to move
     """
+
+    image_path = pathlib.Path(file_path)
+    if not image_path.exists():
+        return f"ERROR: Image not found at {file_path}"
+
+    black_view = _get_perspective_from_image_file_path(image_path)
+
     try:
-        path = pathlib.Path(file_path)
-        if not path.exists():
-            return f"ERROR: Image not found at {file_path}"
-        fen = get_fen_from_image_path(str(path))
+        fen = get_fen_from_image_path(str(image_path), black_view=black_view)
         # Ensure full FEN (side to move etc.). If only piece placement returned, append defaults.
         if fen.count(" ") < 5:
             turn_indicator = "b" if black_to_move else "w"
@@ -636,10 +629,8 @@ chess_best_move_from_fen_tool = Tool(
 )
 
 
-# -----------------------------
-# Combined: chess best move from image (FEN extraction + engine)
-# -----------------------------
 
+# Combined: chess best move from image (FEN extraction + engine)
 # Build a pipeline that chains the FEN extractor and Stockfish analyzer
 # This allows LangSmith to see individual outputs of each step
 def _extract_fen_with_turn(input_dict: dict) -> str:
@@ -676,91 +667,46 @@ chess_best_move_from_image_tool = StructuredTool.from_function(
     ),
 )
 
-# -----------------------------
-# Vision QA via Together API through Hugging Face InferenceClient (multimodal)
-# -----------------------------
-
-
-def vision_qa(input_str: str) -> str:
+def vision_qa(image_path: str, question: str) -> str:
     """
-    Answer a question about an image using a multimodal chat model via Together API through Hugging Face.
-    Input: image absolute path and question text joined by '||', e.g., '/abs/path.png||What is shown?'.
-    Output: model's answer as plain text.
+    Answer a question about an image.
+    
+    Args:
+        image_path: Absolute path to the image file
+        question: Question to ask about the image
+    
+    Returns:
+        Model's answer as plain text
     """
     try:
-        # Parse input: image_path||question
-        parts = input_str.split("||", 1)
-        if len(parts) != 2:
-            return f"ERROR: Input must be 'image_path||question'. Got: {input_str}"
-        image_path, question = parts[0].strip(), parts[1].strip()
-        
         path = pathlib.Path(image_path)
         if not path.exists():
             return f"ERROR: Image not found at {image_path}"
 
-        # Detect image format from actual file content using PIL
-        try:
-            with Image.open(path) as img:
-                format_to_mime = {
-                    'PNG': 'image/png',
-                    'JPEG': 'image/jpeg',
-                    'JPG': 'image/jpeg',
-                    'GIF': 'image/gif',
-                    'WEBP': 'image/webp',
-                }
-                img_format = img.format
-                if not img_format or img_format not in format_to_mime:
-                    return f"ERROR: Unsupported image format: {img_format}"
-                mime = format_to_mime[img_format]
-        except Exception as e:
-            return f"ERROR: Could not read image: {e}"
-        
-        # Read image as bytes and encode as base64 data URL
-        with open(path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
-        image_url = f"data:{mime};base64,{b64}"
+        with open(path, "rb") as image_file:
+            output = replicate.run(
+                "google/gemini-2.5-flash",
+                input={
+                    "images": [image_file],
+                    "prompt": question,
+                },
+            )
 
-        # Create InferenceClient with Together provider
-        hf_token = os.getenv("HUGGING_FACE_HUB_TOKEN")
-        if not hf_token:
-            return "ERROR: HUGGING_FACE_HUB_TOKEN environment variable not set"
-        
-        client = InferenceClient(
-            provider="together",
-            api_key=hf_token
-        )
+        # Join output parts into a single string
+        if isinstance(output, list):
+            text = "".join(str(part) for part in output).strip()
+        else:
+            text = str(output).strip()
 
-        # Use chat completion with image
-        response = client.chat.completions.create(
-            model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": question},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_url}
-                        },
-                    ]
-                }
-            ],
-            temperature=0.0,
-        )
-        
-        # Extract response text
-        if hasattr(response, "choices") and len(response.choices) > 0:
-            return response.choices[0].message.content
-        return str(response)
+        return text or "ERROR: Empty response from vision model."
     except Exception as e:
         return f"ERROR vision_qa: {e}"
 
-vision_qa_tool = Tool(
-    name="vision_qa",
+vision_qa_tool = StructuredTool.from_function(
     func=vision_qa,
+    name="vision_qa",
     description=(
         "Answer a question about an image using a multimodal model. "
-        "Input: image absolute path and question text joined by '||', e.g., '/abs/path.png||What is shown?'. "
-        "Returns the answer as plain text."
+        "Provide the absolute path to the image file and your question about it."
     ),
 )
