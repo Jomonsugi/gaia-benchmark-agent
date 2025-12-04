@@ -3,6 +3,10 @@ import warnings
 
 # Suppress TensorFlow warnings (from board_to_fen library)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress INFO/WARN/ERROR
+# Force TensorFlow to be single-threaded and CPU-only
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
 warnings.filterwarnings("ignore", message=".*tf.function retracing.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 
@@ -564,6 +568,65 @@ def _get_perspective_from_image_file_path(image_path: str) -> str:
 
     return black_view
 
+def _get_fen_in_subprocess(image_path_str: str, black_view: bool, black_to_move: bool) -> str:
+    """
+    Run get_fen_from_image_path in a subprocess to isolate TensorFlow from LangGraph's execution context.
+    """
+    import sys
+    import json
+    
+    # Create a script that runs in the subprocess
+    script = f"""
+import sys
+import json
+from board_to_fen.predict import get_fen_from_image_path
+
+image_path = {repr(image_path_str)}
+black_view = {black_view}
+black_to_move = {black_to_move}
+
+try:
+    fen = get_fen_from_image_path(image_path, black_view=black_view)
+    # Ensure full FEN (side to move etc.). If only piece placement returned, append defaults.
+    if fen.count(" ") < 5:
+        turn_indicator = "b" if black_to_move else "w"
+        fen = fen + " " + turn_indicator + " - - 0 1"
+    result = {{"success": True, "fen": fen}}
+except Exception as e:
+    result = {{"success": False, "error": str(e)}}
+
+print(json.dumps(result))
+sys.stdout.flush()
+"""
+    
+    try:
+        # Run in subprocess with timeout
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=60.0,  # 60 second timeout
+            cwd=str(pathlib.Path(__file__).parent)
+        )
+        
+        if result.returncode != 0:
+            return f"ERROR: Subprocess failed with code {result.returncode}: {result.stderr}"
+        
+        output = result.stdout.strip()
+        data = json.loads(output)
+        
+        if data.get("success"):
+            return data["fen"]
+        else:
+            return f"ERROR extracting FEN via board_to_fen: {data.get('error', 'Unknown error')}"
+            
+    except subprocess.TimeoutExpired:
+        return "ERROR: FEN extraction timed out after 60 seconds in subprocess"
+    except json.JSONDecodeError:
+        return f"ERROR: Failed to parse subprocess output: {result.stdout[:100]}"
+    except Exception as e:
+        return f"ERROR in subprocess execution: {e}"
+
 def get_fen_from_image_file_path(file_path: str, black_to_move: bool = True) -> str:
     """
     Extract a chess position FEN from a board image (.png/.jpg).
@@ -579,16 +642,17 @@ def get_fen_from_image_file_path(file_path: str, black_to_move: bool = True) -> 
         return f"ERROR: Image not found at {file_path}"
 
     black_view = _get_perspective_from_image_file_path(image_path)
+    
+    # Check if black_view is a boolean (it should be)
+    if not isinstance(black_view, bool):
+        # If it returned an error string, return it
+        if isinstance(black_view, str) and black_view.startswith("ERROR"):
+            return black_view
+        # Unexpected return type - return error
+        return f"ERROR: Unexpected return type from perspective detection: {type(black_view)}"
 
-    try:
-        fen = get_fen_from_image_path(str(image_path), black_view=black_view)
-        # Ensure full FEN (side to move etc.). If only piece placement returned, append defaults.
-        if fen.count(" ") < 5:
-            turn_indicator = "b" if black_to_move else "w"
-            fen = f"{fen} {turn_indicator} - - 0 1"
-        return fen
-    except Exception as e:
-        return f"ERROR extracting FEN via board_to_fen: {e}"
+    # Run FEN extraction in subprocess to isolate TensorFlow
+    return _get_fen_in_subprocess(str(image_path), black_view, black_to_move)
 
 
 get_fen_from_image_file_path_tool = StructuredTool.from_function(
@@ -650,6 +714,7 @@ solve_fen_runnable = RunnableLambda(
 def _chess_pipeline_wrapper(file_path: str, black_to_move: bool = True) -> str:
     """Wrapper that chains FEN extraction and analysis"""
     # Extract FEN (visible in LangSmith)
+    # Now safe to use RunnableLambda since TensorFlow runs in subprocess
     input_dict = {"file_path": file_path, "black_to_move": black_to_move}
     fen = extract_fen_runnable.invoke(input_dict)
     if fen.startswith("ERROR"):
