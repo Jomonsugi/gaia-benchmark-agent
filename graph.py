@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph.message import add_messages
 from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
 from tools import (
@@ -30,6 +31,7 @@ class AgentState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], add_messages]
     attachment_file_name: str | None
     attachment_local_path: str | None
+    error: str | None
 
 
 def load_llm():
@@ -103,12 +105,23 @@ to be put in the list is a number or a string.
             "messages": [info_message],
         }
 
-    def assistant(state: AgentState):
+    def assistant(state: AgentState, config: RunnableConfig):
         msgs = state.get("messages", [])
         if msgs and isinstance(msgs[0], str):
             msgs = [HumanMessage(content=msgs[0])]
-        out = chat_with_tools.invoke([sys_msg] + msgs)
-        return {"messages": [out]}
+        try:
+            out = chat_with_tools.invoke([sys_msg] + msgs)
+            return {"messages": [out], "error": None}
+        except Exception as e:
+            return {"error": f"ERROR: {e}"}
+
+    def handle_error(state: AgentState):
+        error_msg = state.get("error") or "ERROR: Unknown failure."
+        existing_msgs = state.get("messages", [])
+        return {
+            "messages": existing_msgs + [AIMessage(content=error_msg)],
+            "error": None,
+        }
 
     def extract_final_answer(content: str) -> str:
         text = content if isinstance(content, str) else str(content)
@@ -131,15 +144,26 @@ to be put in the list is a number or a string.
         final_message = AIMessage(content=final_text)
         return {"messages": messages[:-1] + [final_message]}
 
+    def route_after_assistant(state: AgentState):
+        if state.get("error"):
+            return "error_handler"
+        return tools_condition(state)
+
     builder = StateGraph(AgentState)
     builder.add_node("prepare_attachment", prepare_attachment)
     builder.add_node("assistant", assistant)
+    builder.add_node("error_handler", handle_error)
     builder.add_node("finalize", finalize)
     builder.add_node("tools", ToolNode(tools))
     builder.add_edge(START, "prepare_attachment")
     builder.add_edge("prepare_attachment", "assistant")
-    builder.add_conditional_edges("assistant", tools_condition, {"tools": "tools", END: "finalize"})
+    builder.add_conditional_edges(
+        "assistant",
+        route_after_assistant,
+        {"tools": "tools", END: "finalize", "error_handler": "error_handler"},
+    )
     builder.add_edge("tools", "assistant")
+    builder.add_edge("error_handler", "finalize")
     builder.add_edge("finalize", END)
     return builder.compile()
 

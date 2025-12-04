@@ -757,7 +757,7 @@ wheels = [
 [[package]]
 name = "final-assignment-template"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "board-to-fen" },
@@ -775,6 +775,7 @@ dependencies = [
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "playwright" },
+    { name = "python-dotenv" },
     { name = "replicate" },
     { name = "requests" },
     { name = "stockfish" },
@@ -811,6 +812,7 @@ requires-dist = [
     { name = "openpyxl", specifier = ">=3.1.2" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "playwright", specifier = ">=1.49.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "replicate", specifier = ">=1.0.7" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "stockfish", specifier = ">=3.28.0" },
