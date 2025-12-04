@@ -375,7 +375,13 @@ with gr.Blocks() as demo:
         datatype=["bool", "number", "str"],
         interactive=True,
     )
-    answers_table = gr.DataFrame(label="Agent Answers", wrap=True)
+    answers_table = gr.Dataframe(
+        label="Agent Answers",
+        headers=["Task ID", "Question", "Submitted Answer"],
+        datatype=["str", "str", "str"],
+        row_count=(10, "dynamic"),  # show more rows by default while still allowing growth
+        interactive=False,
+    )
 
     # Wire up actions
     # Note: Profile is automatically injected by LoginButton when function accepts it as first parameter
