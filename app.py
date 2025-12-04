@@ -5,12 +5,17 @@ import pandas as pd
 import typing as t
 import json
 
+from dotenv import load_dotenv
+
 from langchain_core.messages import HumanMessage
 from graph import graph as agent_graph
 
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 QUESTIONS_CACHE_PATH = os.path.join(os.path.dirname(__file__), "questions_cache.json")
+
+# Load environment variables from .env if present
+load_dotenv()
 
 # Global LangGraph execution settings (used for all batch runs)
 DEFAULT_RECURSION_LIMIT = 50

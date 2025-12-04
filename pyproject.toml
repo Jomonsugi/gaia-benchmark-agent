@@ -20,6 +20,7 @@ dependencies = [
     "tabulate>=0.9.0",
     "torch>=2.0.0",
     "transformers>=4.30.0",
+    "python-dotenv>=1.0.1",
     "board_to_fen @ git+https://github.com/civerson/board_to_fen.git@main",
     "tensorflow>=2.13,<3",
     "chess>=1.10.0",
