@@ -21,3 +21,4 @@ venv/
 gaia_cache/
 questions_cache.json
 studio/.langgraph_api/
+downloaded_videos/
