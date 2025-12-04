@@ -1,2 +1,27 @@
--e .
-
+ddgs>=9.6.1
+gradio>=5.49.1
+huggingface-hub>=0.36.0
+itsdangerous>=2.2.0
+langchain-community>=0.4
+langchain-core>=1.0.1
+langchain-huggingface>=1.0.0
+langchain-tavily>=0.2.12
+langgraph>=1.0.1
+librosa>=0.10.0
+openpyxl>=3.1.2
+pandas>=2.2.0
+requests>=2.32.5
+tabulate>=0.9.0
+torch>=2.0.0
+transformers>=4.30.0
+python-dotenv>=1.0.1
+board_to_fen @ git+https://github.com/civerson/board_to_fen.git@main
+tensorflow>=2.13,<3
+chess>=1.10.0
+stockfish>=3.28.0
+wikipedia>=1.4.0
+youtube-transcript-api>=1.2.3
+replicate>=1.0.7
+yt-dlp>=2024.10.7
+beautifulsoup4>=4.12.0
+playwright>=1.49.0
