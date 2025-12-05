@@ -1,5 +1,5 @@
 [project]
-name = "final-assignment-template"
+name = "gaia_benchmark_agent"
 version = "0.1.0"
 description = "GAIA benchmark agent with LangGraph"
 requires-python = ">=3.11"
