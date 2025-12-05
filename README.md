@@ -1,62 +1,41 @@
----
-title: Gaia Agent
-emoji: 🐠
-colorFrom: yellow
-colorTo: green
-sdk: gradio
-sdk_version: "5.49.1"
-app_file: app.py
-pinned: false
----
+## GAIA Benchmark Agent (`gaia_benchmark_agent`)
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+Minimal Gradio app + LangGraph agent for answering GAIA benchmark questions
 
-## Local Development (uv)
+Based on the template provided in Hugging Face's Agents Course.
+As I expanded the app to make development iteration easier, I found a locally hosted app to be handy for experimentation and sufficient for checking answers.
 
-### 1) Set up the environment with uv
+[agents-course](https://huggingface.co/agents-course)
+[Final_Assignment_Template](https://huggingface.co/spaces/agents-course/Final_Assignment_Template)
+
+## Local development (uv)
+
+### 1) Set up the environment
+
+From the project root:
 
 ```bash
-cd /Users/micahshanks/Dev/hf_agents_course/final_project/Final_Assignment_Template
 uv venv .venv
 # Optional: activate; uv run will use the venv automatically
 source .venv/bin/activate  # macOS/Linux
 
-# Install dependencies from requirements.txt
-uv pip install -r requirements.txt
+# Install dependencies from pyproject.toml / uv.lock
+uv sync
 ```
 
-### 2) Set your Hugging Face token
-
-Export one of the following environment variables before starting the app:
-
-```bash
-export HUGGINGFACE_HUB_TOKEN=YOUR_TOKEN   # preferred
-# or
-export HUGGING_FACE_HUB_TOKEN=YOUR_TOKEN
-```
-
-### 3) Run the Gradio app
+### 2) Run the Gradio app
 
 ```bash
 uv run python app.py
 ```
 
-You should see output similar to:
+Then open the printed local URL in your browser (by default `http://127.0.0.1:7860`).
 
-```
-* Running on local URL:  http://127.0.0.1:7860
-* To create a public link, set `share=True` in `launch()`.
-```
+## Optional: LangGraph Studio
 
-Open the printed URL in your browser.
-
-## LangGraph Studio (optional)
-
-To explore the graph used in Studio:
+To explore the LangGraph-based agent in Studio:
 
 ```bash
-cd /Users/micahshanks/Dev/hf_agents_course/final_project/Final_Assignment_Template/studio
+cd studio
 uv run langgraph dev
 ```
-
-If you see an error about `langgraph.json`, ensure the file exists in the `studio` directory.
