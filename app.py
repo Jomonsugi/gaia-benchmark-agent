@@ -1,4 +1,6 @@
 import os
+import re
+import string
 import gradio as gr
 import requests
 import pandas as pd
@@ -6,6 +8,7 @@ import typing as t
 import json
 
 from dotenv import load_dotenv
+from datasets import load_dataset
 
 from langchain_core.messages import HumanMessage
 from graph import graph as agent_graph
@@ -20,6 +23,67 @@ load_dotenv()
 # Global LangGraph execution settings (used for all batch runs)
 DEFAULT_RECURSION_LIMIT = 50
 DEFAULT_MAX_CONCURRENCY = 5
+
+# Cache for GAIA ground truth answers
+_gaia_ground_truth_cache: dict[str, str] | None = None
+
+
+def normalize_answer(answer: str) -> str:
+    """
+    Normalize answers for comparison:
+    - lowercase
+    - trim whitespace
+    - collapse internal whitespace
+    - strip surrounding punctuation
+    - normalize common booleans/yes/no
+    """
+    if answer is None:
+        return ""
+    text = str(answer).strip().lower()
+    text = re.sub(r"\s+", " ", text)
+    text = text.strip(string.punctuation + " ")
+
+    booleans = {
+        "yes": "true",
+        "yeah": "true",
+        "y": "true",
+        "true": "true",
+        "no": "false",
+        "nah": "false",
+        "n": "false",
+        "false": "false",
+    }
+    if text in booleans:
+        return booleans[text]
+    return text
+
+
+def load_gaia_ground_truth() -> dict[str, str]:
+    """
+    Load and cache GAIA ground truth answers (task_id -> answer) using the
+    2023_all config and validation split.
+    """
+    global _gaia_ground_truth_cache
+    if _gaia_ground_truth_cache is not None:
+        return _gaia_ground_truth_cache
+
+    ds = load_dataset("gaia-benchmark/GAIA", "2023_all", split="validation")
+
+    answers: dict[str, str] = {}
+    for row in ds:
+        task_id = str(row.get("task_id") or "").strip()
+        # Dataset fields use capitalized keys; fall back to lowercase if needed
+        raw_answer = (
+            row.get("Final answer")
+            or row.get("final_answer")
+            or row.get("answer")
+            or ""
+        )
+        answer = str(raw_answer).strip()
+        if task_id:
+            answers[task_id] = answer
+    _gaia_ground_truth_cache = answers
+    return answers
 
 def load_cached_questions() -> list:
     try:
@@ -136,7 +200,8 @@ def run_agent(selection_df: t.Any = None):
     task_metadata = []
     
     for _, row in df.iterrows():
-        task_id = row.get("Task ID")
+        task_id_raw = row.get("Task ID")
+        task_id = str(task_id_raw) if task_id_raw is not None else ""
         question_text = row.get("Question")
         file_name = row.get("File Name") or ""
         
@@ -167,28 +232,47 @@ def run_agent(selection_df: t.Any = None):
     except Exception as e:
         return f"Error running batch: {e}", pd.DataFrame(), []
     
+    # Load ground truth for comparison
+    ground_truth = load_gaia_ground_truth()
+
     # Build outputs
     results_log = []
     answers_payload = []
+    correct_count = 0
+    total_count = len(task_metadata)
     
     for metadata, result in zip(task_metadata, results):
         try:
             answer = result["messages"][-1].content
         except Exception as e:
             answer = f"AGENT ERROR: {e}"
-        
+
+        task_id = metadata["task_id"]
+        question_text = metadata["question"]
+        correct_answer = ground_truth.get(task_id, "")
+        is_correct = False
+        if correct_answer:
+            normalized_submitted = normalize_answer(answer)
+            normalized_correct = normalize_answer(correct_answer)
+            is_correct = normalized_submitted == normalized_correct
+            if is_correct:
+                correct_count += 1
+
         results_log.append({
-            "Task ID": metadata["task_id"],
-            "Question": metadata["question"],
-            "Submitted Answer": answer
+            "Task ID": task_id,
+            "Question": question_text,
+            "Submitted Answer": answer,
+            "Correct Answer": correct_answer if correct_answer else "N/A",
+            "Match": "✓" if is_correct else "✗",
         })
         answers_payload.append({
-            "task_id": metadata["task_id"],
+            "task_id": task_id,
             "submitted_answer": answer
         })
-    
+
+    score_percent = (correct_count / total_count * 100.0) if total_count else 0.0
     return (
-        f"Ran agent on {len(answers_payload)} questions in parallel. Review answers below.",
+        f"Ran agent on {len(answers_payload)} questions. Score: {correct_count}/{total_count} correct ({score_percent:.2f}%). Review answers below.",
         pd.DataFrame(results_log),
         answers_payload
     )
@@ -268,7 +352,8 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
     task_metadata = []
     
     for item in questions_data:
-        task_id = item.get("task_id")
+        task_id_raw = item.get("task_id")
+        task_id = str(task_id_raw) if task_id_raw is not None else ""
         question_text = item.get("question")
         file_name = item.get("file_name") or ""
         
@@ -297,23 +382,41 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
     except Exception as e:
         return f"Error running batch: {e}", None
     
+    # Load ground truth for comparison
+    ground_truth = load_gaia_ground_truth()
+
     # Build submission payload
     results_log = []
     answers_payload = []
+    correct_count = 0
+    total_count = len(task_metadata)
     
     for metadata, result in zip(task_metadata, results):
         try:
             answer = result["messages"][-1].content
         except Exception as e:
             answer = f"AGENT ERROR: {e}"
-        
+
+        task_id = metadata["task_id"]
+        question_text = metadata["question"]
+        correct_answer = ground_truth.get(task_id, "")
+        is_correct = False
+        if correct_answer:
+            normalized_submitted = normalize_answer(answer)
+            normalized_correct = normalize_answer(correct_answer)
+            is_correct = normalized_submitted == normalized_correct
+            if is_correct:
+                correct_count += 1
+
         results_log.append({
-            "Task ID": metadata["task_id"],
-            "Question": metadata["question"],
-            "Submitted Answer": answer
+            "Task ID": task_id,
+            "Question": question_text,
+            "Submitted Answer": answer,
+            "Correct Answer": correct_answer if correct_answer else "N/A",
+            "Match": "✓" if is_correct else "✗",
         })
         answers_payload.append({
-            "task_id": metadata["task_id"],
+            "task_id": task_id,
             "submitted_answer": answer
         })
     
@@ -353,8 +456,7 @@ with gr.Blocks() as demo:
         2.  **Fetch Questions:** Click "Fetch Questions" to load questions from the GAIA benchmark API.
         3.  **Select Questions:** Toggle individual questions or use "Select all questions" checkbox.
         4.  **Run Agent:** Click "Run Agent" to process selected questions in parallel (up to 5 concurrent).
-        5.  **Review Answers:** Check the results in the "Agent Answers" table before submitting.
-        6.  **Submit:** Click "Submit Answers for Scoring" to send your cached answers to the evaluation API.
+        5.  **Review Answers:** Check the results in the "Agent Answers" table to see correctness vs ground truth.
 
         """
     )
@@ -367,8 +469,7 @@ with gr.Blocks() as demo:
 
     # Buttons & controls
     fetch_button = gr.Button("Fetch Questions")
-    run_button = gr.Button("Run Agent (no submission)")
-    submit_button = gr.Button("Submit Answers for Scoring")
+    run_button = gr.Button("Run Agent")
     refresh_cb = gr.Checkbox(label="Refresh questions from API", value=False)
     # Default: no questions selected and 'select all' unchecked until user opts in
     select_all_cb = gr.Checkbox(label="Select all questions", value=False)
@@ -382,8 +483,8 @@ with gr.Blocks() as demo:
     )
     answers_table = gr.Dataframe(
         label="Agent Answers",
-        headers=["Task ID", "Question", "Submitted Answer"],
-        datatype=["str", "str", "str"],
+        headers=["Task ID", "Question", "Submitted Answer", "Correct Answer", "Match"],
+        datatype=["str", "str", "str", "str", "str"],
         row_count=(10, "dynamic"),  # show more rows by default while still allowing growth
         interactive=False,
     )
@@ -406,12 +507,6 @@ with gr.Blocks() as demo:
         fn=select_all_toggle,
         inputs=[select_all_cb, questions_table],
         outputs=[questions_table],
-    )
-
-    submit_button.click(
-        fn=submit_answers,
-        inputs=[questions_state, answers_state],
-        outputs=[status_output],
     )
 
 if __name__ == "__main__":
