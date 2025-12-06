@@ -755,83 +755,6 @@ wheels = [
 ]
 
 [[package]]
-name = "final-assignment-template"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "board-to-fen" },
-    { name = "chess" },
-    { name = "ddgs" },
-    { name = "gradio" },
-    { name = "huggingface-hub" },
-    { name = "itsdangerous" },
-    { name = "langchain-community" },
-    { name = "langchain-core" },
-    { name = "langchain-huggingface" },
-    { name = "langchain-tavily" },
-    { name = "langgraph" },
-    { name = "librosa" },
-    { name = "openpyxl" },
-    { name = "pandas" },
-    { name = "playwright" },
-    { name = "python-dotenv" },
-    { name = "replicate" },
-    { name = "requests" },
-    { name = "stockfish" },
-    { name = "tabulate" },
-    { name = "tensorflow" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "wikipedia" },
-    { name = "youtube-transcript-api" },
-    { name = "yt-dlp" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ipykernel" },
-    { name = "langgraph-cli", extra = ["inmem"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "board-to-fen", git = "https://github.com/civerson/board_to_fen.git?rev=main" },
-    { name = "chess", specifier = ">=1.10.0" },
-    { name = "ddgs", specifier = ">=9.6.1" },
-    { name = "gradio", specifier = ">=5.49.1" },
-    { name = "huggingface-hub", specifier = ">=0.36.0" },
-    { name = "itsdangerous", specifier = ">=2.2.0" },
-    { name = "langchain-community", specifier = ">=0.4" },
-    { name = "langchain-core", specifier = ">=1.0.1" },
-    { name = "langchain-huggingface", specifier = ">=1.0.0" },
-    { name = "langchain-tavily", specifier = ">=0.2.12" },
-    { name = "langgraph", specifier = ">=1.0.1" },
-    { name = "librosa", specifier = ">=0.10.0" },
-    { name = "openpyxl", specifier = ">=3.1.2" },
-    { name = "pandas", specifier = ">=2.2.0" },
-    { name = "playwright", specifier = ">=1.49.0" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "replicate", specifier = ">=1.0.7" },
-    { name = "requests", specifier = ">=2.32.5" },
-    { name = "stockfish", specifier = ">=3.28.0" },
-    { name = "tabulate", specifier = ">=0.9.0" },
-    { name = "tensorflow", specifier = ">=2.13,<3" },
-    { name = "torch", specifier = ">=2.0.0" },
-    { name = "transformers", specifier = ">=4.30.0" },
-    { name = "wikipedia", specifier = ">=1.4.0" },
-    { name = "youtube-transcript-api", specifier = ">=1.2.3" },
-    { name = "yt-dlp", specifier = ">=2024.10.7" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "ipykernel", specifier = ">=7.1.0" },
-    { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.4" },
-]
-
-[[package]]
 name = "flatbuffers"
 version = "25.9.23"
 source = { registry = "https://pypi.org/simple" }
@@ -958,6 +881,83 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/de/e0/bab50af11c2d75c9c4a2a26a5254573c0bd97cea152254401510950486fa/fsspec-2025.9.0.tar.gz", hash = "sha256:19fd429483d25d28b65ec68f9f4adc16c17ea2c7c7bf54ec61360d478fb19c19", size = 304847, upload-time = "2025-09-02T19:10:49.215Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl", hash = "sha256:530dc2a2af60a414a832059574df4a6e10cce927f6f4a78209390fe38955cfb7", size = 199289, upload-time = "2025-09-02T19:10:47.708Z" },
+]
+
+[[package]]
+name = "gaia-benchmark-agent"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "board-to-fen" },
+    { name = "chess" },
+    { name = "ddgs" },
+    { name = "gradio" },
+    { name = "huggingface-hub" },
+    { name = "itsdangerous" },
+    { name = "langchain-community" },
+    { name = "langchain-core" },
+    { name = "langchain-huggingface" },
+    { name = "langchain-tavily" },
+    { name = "langgraph" },
+    { name = "librosa" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "playwright" },
+    { name = "python-dotenv" },
+    { name = "replicate" },
+    { name = "requests" },
+    { name = "stockfish" },
+    { name = "tabulate" },
+    { name = "tensorflow" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "wikipedia" },
+    { name = "youtube-transcript-api" },
+    { name = "yt-dlp" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+    { name = "langgraph-cli", extra = ["inmem"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "board-to-fen", git = "https://github.com/civerson/board_to_fen.git?rev=main" },
+    { name = "chess", specifier = ">=1.10.0" },
+    { name = "ddgs", specifier = ">=9.6.1" },
+    { name = "gradio", specifier = ">=5.49.1" },
+    { name = "huggingface-hub", specifier = ">=0.36.0" },
+    { name = "itsdangerous", specifier = ">=2.2.0" },
+    { name = "langchain-community", specifier = ">=0.4" },
+    { name = "langchain-core", specifier = ">=1.0.1" },
+    { name = "langchain-huggingface", specifier = ">=1.0.0" },
+    { name = "langchain-tavily", specifier = ">=0.2.12" },
+    { name = "langgraph", specifier = ">=1.0.1" },
+    { name = "librosa", specifier = ">=0.10.0" },
+    { name = "openpyxl", specifier = ">=3.1.2" },
+    { name = "pandas", specifier = ">=2.2.0" },
+    { name = "playwright", specifier = ">=1.49.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "replicate", specifier = ">=1.0.7" },
+    { name = "requests", specifier = ">=2.32.5" },
+    { name = "stockfish", specifier = ">=3.28.0" },
+    { name = "tabulate", specifier = ">=0.9.0" },
+    { name = "tensorflow", specifier = ">=2.13,<3" },
+    { name = "torch", specifier = ">=2.0.0" },
+    { name = "transformers", specifier = ">=4.30.0" },
+    { name = "wikipedia", specifier = ">=1.4.0" },
+    { name = "youtube-transcript-api", specifier = ">=1.2.3" },
+    { name = "yt-dlp", specifier = ">=2024.10.7" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=7.1.0" },
+    { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.4" },
 ]
 
 [[package]]
