@@ -1,7 +1,8 @@
 ## GAIA Benchmark Agent (`gaia_benchmark_agent`)
-[What is the GAIA Benchmark?](https://huggingface.co/papers/2311.12983)
 
 Minimal Gradio app + LangGraph agent for answering GAIA benchmark questions
+
+[What is the GAIA Benchmark?](https://huggingface.co/papers/2311.12983)
 
 Based on the template provided in Hugging Face's Agents Course.
 As I expanded the app to make development iteration easier, I found a locally hosted app to be handy for experimentation and sufficient for checking answers.
